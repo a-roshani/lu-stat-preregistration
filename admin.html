@@ -45,6 +45,7 @@
         <button class="admin-tab" data-tab="courses" type="button">مدیریت دروس</button>
         <button class="admin-tab" data-tab="demand" type="button">تقاضای دروس</button>
         <button class="admin-tab" data-tab="overlap" type="button">هم‌پوشانی دروس</button>
+        <button class="admin-tab" data-tab="scheduler" type="button">خروجی برنامه‌ریز</button>
       </nav>
 
       <section id="tabStudents" class="card admin-panel">
@@ -148,11 +149,34 @@
 
       <section id="tabOverlap" class="card admin-panel hidden">
         <div class="section-heading"><div><h2>دانشجویان مشترک بین دروس</h2></div><small>برای استخراج محدودیت عدم تداخل زمانی</small></div>
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>درس اول</th><th>درس دوم</th><th>تعداد دانشجوی مشترک</th></tr></thead><tbody id="overlapTableBody"></tbody></table></div>
+        <p class="help">برای هر جفت درس علاوه بر تعداد، می‌توانی فهرست دانشجویان مشترک را هم باز کنی. تصمیم سخت/نرم درباره تداخل در خود University Scheduler گرفته می‌شود.</p>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>درس اول</th><th>درس دوم</th><th>تعداد دانشجوی مشترک</th><th>دانشجویان</th></tr></thead><tbody id="overlapTableBody"></tbody></table></div>
+      </section>
+
+      <section id="tabScheduler" class="card admin-panel hidden">
+        <div class="section-heading">
+          <div><h2>خروجی برای University Scheduler</h2></div>
+          <small>Snapshot امن از پیش‌ثبت‌نام فعلی</small>
+        </div>
+        <div class="export-info-grid">
+          <div class="export-info"><span>دانشجو</span><strong id="exportStudents">۰</strong></div>
+          <div class="export-info"><span>انتخاب درس</span><strong id="exportSelections">۰</strong></div>
+          <div class="export-info"><span>جفت درس دارای اشتراک</span><strong id="exportOverlaps">۰</strong></div>
+          <div class="export-info"><span>زمان تهیه خروجی</span><strong id="exportTimestamp">—</strong></div>
+        </div>
+        <div class="notice export-notice">
+          این فایل شامل نام، شماره دانشجویی، ورودی و درس‌های انتخابی دانشجویان است و فقط برای انتقال به برنامه‌ریز دانشگاهی طراحی شده است.
+          فایل را عمومی منتشر نکن و در GitHub قرار نده.
+        </div>
+        <div class="actions">
+          <button id="downloadSchedulerBtn" class="primary" type="button">دانلود فایل مخصوص University Scheduler</button>
+          <button id="downloadBackupBtn" class="secondary" type="button">دانلود پشتیبان کامل داده‌های فعلی</button>
+        </div>
+        <div id="exportMessage" class="message"></div>
       </section>
     </section>
 
-    <footer><a href="index.html">بازگشت به سامانه دانشجو</a> · نسخه آزمایشی ۰.۵</footer>
+    <footer><a href="index.html">بازگشت به سامانه دانشجو</a> · نسخه آزمایشی ۰.۶</footer>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

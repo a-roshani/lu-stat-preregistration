@@ -11,7 +11,8 @@ const els = {
   adminCourseList:$('adminCourseList'), newPin:$('newPin'), saveStudentBtn:$('saveStudentBtn'), cancelEditBtn:$('cancelEditBtn'), editorMessage:$('editorMessage'),
   coursesTableBody:$('coursesTableBody'), courseAdminSearch:$('courseAdminSearch'), newCourseBtn:$('newCourseBtn'), courseEditor:$('courseEditor'), courseEditorTitle:$('courseEditorTitle'), courseEditorId:$('courseEditorId'),
   courseName:$('courseName'), courseInstructor:$('courseInstructor'), courseCredits:$('courseCredits'), courseLevel:$('courseLevel'), courseMainEntry:$('courseMainEntry'), courseAllowedEntries:$('courseAllowedEntries'),
-  courseOutOfChart:$('courseOutOfChart'), courseActive:$('courseActive'), saveCourseBtn:$('saveCourseBtn'), cancelCourseBtn:$('cancelCourseBtn'), courseEditorMessage:$('courseEditorMessage')
+  courseOutOfChart:$('courseOutOfChart'), courseActive:$('courseActive'), saveCourseBtn:$('saveCourseBtn'), cancelCourseBtn:$('cancelCourseBtn'), courseEditorMessage:$('courseEditorMessage'),
+  downloadSchedulerBtn:$('downloadSchedulerBtn'), downloadBackupBtn:$('downloadBackupBtn'), exportMessage:$('exportMessage'), exportStudents:$('exportStudents'), exportSelections:$('exportSelections'), exportOverlaps:$('exportOverlaps'), exportTimestamp:$('exportTimestamp')
 };
 let state = {students:[], demand:[], overlap:[], courses:[], editingId:null, editingCourseId:null};
 
@@ -22,6 +23,62 @@ function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt
 function selectedAdminCourses(){return [...document.querySelectorAll('.admin-course-check:checked')].map(x=>x.value);}
 function selectedAllowedEntries(){return [...document.querySelectorAll('.allowed-entry-check:checked')].map(x=>x.value);}
 function demandCount(courseId){const d=state.demand.find(x=>x.course_id===courseId);return d?Number(d.student_count||0):0;}
+function downloadJson(filename,payload){
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),500);
+}
+function pairKey(a,b){return [String(a),String(b)].sort().join('|||');}
+function buildDetailedOverlaps(){
+  const courseById=new Map(state.courses.map(c=>[String(c.id),c]));
+  const pairs=new Map();
+  for(const student of state.students){
+    const ids=[...new Set((student.course_ids||[]).map(String))].sort();
+    for(let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++){
+      const a=ids[i],b=ids[j],key=pairKey(a,b);
+      if(!pairs.has(key)) pairs.set(key,{course_1_id:a,course_2_id:b,students:[]});
+      pairs.get(key).students.push({
+        student_number:String(student.student_number||''), first_name:String(student.first_name||''), last_name:String(student.last_name||''), entry_year:String(student.entry_year||'')
+      });
+    }
+  }
+  return [...pairs.values()].map(r=>{
+    const c1=courseById.get(r.course_1_id)||{}, c2=courseById.get(r.course_2_id)||{};
+    return {...r,course_1:c1.name_fa||r.course_1_id,course_2:c2.name_fa||r.course_2_id,common_students:r.students.length};
+  }).sort((a,b)=>b.common_students-a.common_students || String(a.course_1).localeCompare(String(b.course_1),'fa'));
+}
+function buildSchedulerExport(){
+  const generatedAt=new Date().toISOString();
+  const overlaps=buildDetailedOverlaps();
+  const students=state.students.map(s=>({
+    student_number:String(s.student_number||''), first_name:String(s.first_name||''), last_name:String(s.last_name||''), entry_year:String(s.entry_year||''),
+    course_ids:(s.course_ids||[]).map(String), course_names:(s.course_names||[]).map(String), updated_at:s.updated_at||null
+  }));
+  const courses=state.courses.map(c=>({
+    id:String(c.id||''), name_fa:String(c.name_fa||''), instructor:String(c.instructor||''), credits:Number(c.credits||0), level:String(c.level||''),
+    main_entry:String(c.main_entry||''), allowed_entries:(c.allowed_entries||[]).map(String), out_of_chart:!!c.out_of_chart, active:c.active!==false
+  }));
+  return {
+    schema_version:'lu-stat-prereg-scheduler-v1', generated_at:generatedAt, source:'LU Statistics Preregistration v0.6',
+    summary:{student_count:students.length,selection_count:students.reduce((n,s)=>n+s.course_ids.length,0),course_count:courses.length,active_course_count:courses.filter(c=>c.active).length,overlap_pair_count:overlaps.length},
+    courses, students, overlaps
+  };
+}
+function refreshExportSummary(){
+  if(!els.exportStudents)return;
+  const overlaps=buildDetailedOverlaps(), selections=state.students.reduce((n,s)=>n+(s.course_ids||[]).length,0);
+  els.exportStudents.textContent=state.students.length.toLocaleString('fa-IR'); els.exportSelections.textContent=selections.toLocaleString('fa-IR'); els.exportOverlaps.textContent=overlaps.length.toLocaleString('fa-IR'); els.exportTimestamp.textContent=new Date().toLocaleString('fa-IR');
+}
+function exportSchedulerFile(){
+  const payload=buildSchedulerExport();
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  downloadJson(`preregistration_scheduler_${stamp}.json`,payload);
+  msg(els.exportMessage,`فایل مخصوص برنامه‌ریز با ${payload.summary.student_count.toLocaleString('fa-IR')} دانشجو و ${payload.summary.overlap_pair_count.toLocaleString('fa-IR')} جفت‌درس ساخته شد. این فایل را در University Scheduler بارگذاری کن.`,'ok');
+}
+function exportFullBackup(){
+  const payload={backup_version:'lu-stat-prereg-backup-v1',generated_at:new Date().toISOString(),courses:state.courses,students:state.students,course_demand:state.demand,course_overlap:buildDetailedOverlaps()};
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-'); downloadJson(`preregistration_full_backup_${stamp}.json`,payload);
+  msg(els.exportMessage,'پشتیبان کامل داده‌های فعلی دانلود شد.','ok');
+}
 
 async function signIn(){
   if(!client) return msg(els.loginMessage,'اتصال Supabase در config.js تنظیم نشده است.','error');
@@ -53,7 +110,7 @@ async function loadDashboard(){
   els.statSelections.textContent=selections.toLocaleString('fa-IR');
   els.statCourses.textContent=state.courses.filter(c=>c.active).length.toLocaleString('fa-IR');
   els.statOverlaps.textContent=state.overlap.length.toLocaleString('fa-IR');
-  renderStudents(); renderCoursesAdmin(); renderDemand(); renderOverlap();
+  renderStudents(); renderCoursesAdmin(); renderDemand(); renderOverlap(); refreshExportSummary();
 }
 
 function renderStudents(){
@@ -74,7 +131,11 @@ function renderDemand(){
   els.demandTableBody.innerHTML=state.demand.filter(r=>r.active!==false).map(r=>`<tr><td>${esc(r.name_fa)}</td><td>${esc(r.instructor)}</td><td>${faLevel(r.level)}</td><td><strong>${Number(r.student_count).toLocaleString('fa-IR')}</strong></td></tr>`).join('') || '<tr><td colspan="4" class="muted">درسی وجود ندارد.</td></tr>';
 }
 function renderOverlap(){
-  els.overlapTableBody.innerHTML=state.overlap.map(r=>`<tr><td>${esc(r.course_1)}</td><td>${esc(r.course_2)}</td><td><strong>${Number(r.common_students).toLocaleString('fa-IR')}</strong></td></tr>`).join('') || '<tr><td colspan="3" class="muted">هنوز جفت‌درسی با دانشجوی مشترک وجود ندارد.</td></tr>';
+  const detailed=buildDetailedOverlaps();
+  els.overlapTableBody.innerHTML=detailed.map(r=>{
+    const people=(r.students||[]).map(s=>`<li>${esc(s.first_name)} ${esc(s.last_name)} · ${esc(s.student_number)} · ورودی ${esc(s.entry_year)}</li>`).join('');
+    return `<tr><td>${esc(r.course_1)}</td><td>${esc(r.course_2)}</td><td><strong>${Number(r.common_students).toLocaleString('fa-IR')}</strong></td><td class="overlap-students"><details><summary>مشاهده ${Number(r.common_students).toLocaleString('fa-IR')} نفر</summary><ul class="overlap-students-list">${people}</ul></details></td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="muted">هنوز جفت‌درسی با دانشجوی مشترک وجود ندارد.</td></tr>';
 }
 
 function renderCoursesAdmin(){
@@ -158,7 +219,8 @@ async function deleteCourse(id){
 
 function switchTab(tab){
   document.querySelectorAll('.admin-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  $('tabStudents').classList.toggle('hidden',tab!=='students'); $('tabCourses').classList.toggle('hidden',tab!=='courses'); $('tabDemand').classList.toggle('hidden',tab!=='demand'); $('tabOverlap').classList.toggle('hidden',tab!=='overlap');
+  $('tabStudents').classList.toggle('hidden',tab!=='students'); $('tabCourses').classList.toggle('hidden',tab!=='courses'); $('tabDemand').classList.toggle('hidden',tab!=='demand'); $('tabOverlap').classList.toggle('hidden',tab!=='overlap'); $('tabScheduler').classList.toggle('hidden',tab!=='scheduler');
+  if(tab==='scheduler') refreshExportSummary();
   if(tab!=='students') closeStudentEditor(); if(tab!=='courses') closeCourseEditor();
 }
 
@@ -166,6 +228,7 @@ document.querySelectorAll('.admin-tab').forEach(b=>b.addEventListener('click',()
 els.loginBtn.addEventListener('click',signIn); els.logoutBtn.addEventListener('click',signOut); els.studentSearch.addEventListener('input',renderStudents); els.refreshBtn.addEventListener('click',loadDashboard);
 els.saveStudentBtn.addEventListener('click',saveStudent); els.cancelEditBtn.addEventListener('click',closeStudentEditor);
 els.courseAdminSearch.addEventListener('input',renderCoursesAdmin); els.newCourseBtn.addEventListener('click',()=>openCourseEditor()); els.saveCourseBtn.addEventListener('click',saveCourse); els.cancelCourseBtn.addEventListener('click',closeCourseEditor);
+if(els.downloadSchedulerBtn)els.downloadSchedulerBtn.addEventListener('click',exportSchedulerFile); if(els.downloadBackupBtn)els.downloadBackupBtn.addEventListener('click',exportFullBackup);
 
 (async()=>{
   if(!configured)return msg(els.loginMessage,'ابتدا config.js را با API URL و Publishable Key تنظیم کنید.','error');
