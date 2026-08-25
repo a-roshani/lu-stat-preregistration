@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#17324d" />
+  <title>مدیریت پیش‌ثبت‌نام دروس</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell admin-shell">
+    <header class="hero card admin-topbar">
+      <div>
+        <div class="eyebrow">دانشگاه لرستان · گروه آمار</div>
+        <h1>مدیریت سامانه پیش‌ثبت‌نام</h1>
+        <p>مدیریت دانشجویان، فهرست دروس، تقاضا و هم‌پوشانی انتخاب‌ها.</p>
+      </div>
+      <div>
+        <div id="adminUser" class="admin-user"></div>
+        <button id="logoutBtn" class="secondary hidden" type="button">خروج از مدیریت</button>
+      </div>
+    </header>
+
+    <section id="loginCard" class="card admin-login">
+      <h2>ورود مدیر</h2>
+      <p class="help">با حساب مدیریتی تعریف‌شده در Supabase وارد شوید.</p>
+      <div class="grid two">
+        <label>ایمیل<input id="adminEmail" type="email" autocomplete="username" /></label>
+        <label>رمز عبور<input id="adminPassword" type="password" autocomplete="current-password" /></label>
+      </div>
+      <button id="loginBtn" class="primary" type="button">ورود</button>
+      <div id="loginMessage" class="message"></div>
+    </section>
+
+    <section id="adminApp" class="hidden">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">دانشجوی ثبت‌شده</div><div id="statStudents" class="stat-value">۰</div></div>
+        <div class="stat-card"><div class="stat-label">کل انتخاب درس</div><div id="statSelections" class="stat-value">۰</div></div>
+        <div class="stat-card"><div class="stat-label">درس فعال</div><div id="statCourses" class="stat-value">۰</div></div>
+        <div class="stat-card"><div class="stat-label">جفت‌درس دارای دانشجوی مشترک</div><div id="statOverlaps" class="stat-value">۰</div></div>
+      </div>
+
+      <nav class="card admin-tabs">
+        <button class="admin-tab active" data-tab="students" type="button">دانشجویان</button>
+        <button class="admin-tab" data-tab="courses" type="button">مدیریت دروس</button>
+        <button class="admin-tab" data-tab="demand" type="button">تقاضای دروس</button>
+        <button class="admin-tab" data-tab="overlap" type="button">هم‌پوشانی دروس</button>
+      </nav>
+
+      <section id="tabStudents" class="card admin-panel">
+        <div class="section-heading">
+          <div><h2>اطلاعات دانشجویان</h2></div>
+          <small id="studentsCountLabel"></small>
+        </div>
+        <div class="admin-toolbar">
+          <input id="studentSearch" type="search" placeholder="جست‌وجو در نام، شماره دانشجویی یا ورودی…" />
+          <button id="refreshBtn" class="secondary" type="button">به‌روزرسانی</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>نام و نام خانوادگی</th><th>شماره دانشجویی</th><th>ورودی</th><th>درس‌های انتخابی</th><th>آخرین تغییر</th><th>عملیات</th></tr></thead>
+            <tbody id="studentsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="studentEditor" class="card editor-card hidden">
+        <div class="section-heading">
+          <div><h2>ویرایش اطلاعات دانشجو</h2></div>
+          <small id="editorStudentId"></small>
+        </div>
+        <div class="grid two">
+          <label>نام<input id="editFirstName" /></label>
+          <label>نام خانوادگی<input id="editLastName" /></label>
+          <label>شماره دانشجویی<input id="editStudentNumber" /></label>
+          <label>ورودی
+            <select id="editEntryYear">
+              <option value="1401">1401</option><option value="1402">1402</option><option value="1403">1403</option><option value="1404">1404</option><option value="1405">1405</option><option value="MSc_1404">MSc_1404</option><option value="MSc_1405">MSc_1405</option><option value="PhD_1404">PhD_1404</option><option value="PhD_1405">PhD_1405</option>
+            </select>
+          </label>
+        </div>
+        <h3>درس‌های انتخابی</h3>
+        <div id="adminCourseList" class="admin-course-list"></div>
+        <div class="grid two" style="margin-top:16px">
+          <label>کد ویرایش جدید (اختیاری)<input id="newPin" type="password" inputmode="numeric" maxlength="8" placeholder="در صورت خالی بودن، کد قبلی حفظ می‌شود" /></label>
+        </div>
+        <div class="actions">
+          <button id="saveStudentBtn" class="primary" type="button">اعمال تغییرات</button>
+          <button id="cancelEditBtn" class="secondary" type="button">انصراف</button>
+        </div>
+        <div id="editorMessage" class="message"></div>
+      </section>
+
+      <section id="tabCourses" class="card admin-panel hidden">
+        <div class="section-heading">
+          <div><h2>مدیریت دروس قابل نمایش به دانشجو</h2></div>
+          <small>افزودن، ویرایش، غیرفعال‌سازی یا حذف کامل</small>
+        </div>
+        <div class="admin-toolbar">
+          <input id="courseAdminSearch" type="search" placeholder="جست‌وجوی درس یا استاد…" />
+          <button id="newCourseBtn" class="primary" type="button">افزودن درس جدید</button>
+        </div>
+        <p class="help">درس غیرفعال برای دانشجویان جدید نمایش داده نمی‌شود، اما اطلاعات و انتخاب‌های قبلی آن حفظ می‌شود. «حذف کامل» درس را از انتخاب دانشجویان نیز حذف می‌کند.</p>
+        <div class="table-wrap">
+          <table class="data-table courses-admin-table">
+            <thead><tr><th>درس</th><th>استاد</th><th>واحد</th><th>مقطع</th><th>ورودی اصلی</th><th>ورودی‌های مجاز</th><th>خارج از چارت</th><th>وضعیت</th><th>متقاضی</th><th>عملیات</th></tr></thead>
+            <tbody id="coursesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="courseEditor" class="card editor-card hidden">
+        <div class="section-heading">
+          <div><h2 id="courseEditorTitle">افزودن درس جدید</h2></div>
+          <small id="courseEditorId"></small>
+        </div>
+        <div class="grid two">
+          <label>نام درس<input id="courseName" /></label>
+          <label>استاد درس<input id="courseInstructor" /></label>
+          <label>تعداد واحد
+            <select id="courseCredits"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+          </label>
+          <label>مقطع
+            <select id="courseLevel"><option value="Undergraduate">کارشناسی</option><option value="Graduate">کارشناسی ارشد</option><option value="PhD">دکتری</option></select>
+          </label>
+          <label>ورودی اصلی
+            <select id="courseMainEntry"></select>
+          </label>
+        </div>
+        <h3>ورودی‌های مجاز</h3>
+        <p class="help">این موارد برای اولویت نمایش درس به دانشجویان همان ورودی استفاده می‌شوند؛ دانشجو همچنان می‌تواند سایر دروس فعال را هم انتخاب کند.</p>
+        <div id="courseAllowedEntries" class="entry-check-grid"></div>
+        <div class="course-flags">
+          <label class="check-line"><input id="courseOutOfChart" type="checkbox" /> درس خارج از چارت است</label>
+          <label class="check-line"><input id="courseActive" type="checkbox" checked /> درس فعال است و برای دانشجو نمایش داده شود</label>
+        </div>
+        <div class="actions">
+          <button id="saveCourseBtn" class="primary" type="button">ثبت درس</button>
+          <button id="cancelCourseBtn" class="secondary" type="button">انصراف</button>
+        </div>
+        <div id="courseEditorMessage" class="message"></div>
+      </section>
+
+      <section id="tabDemand" class="card admin-panel hidden">
+        <div class="section-heading"><div><h2>تعداد متقاضی هر درس</h2></div><small>مرتب‌شده بر اساس بیشترین تقاضا</small></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>درس</th><th>استاد</th><th>مقطع</th><th>تعداد متقاضی</th></tr></thead><tbody id="demandTableBody"></tbody></table></div>
+      </section>
+
+      <section id="tabOverlap" class="card admin-panel hidden">
+        <div class="section-heading"><div><h2>دانشجویان مشترک بین دروس</h2></div><small>برای استخراج محدودیت عدم تداخل زمانی</small></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>درس اول</th><th>درس دوم</th><th>تعداد دانشجوی مشترک</th></tr></thead><tbody id="overlapTableBody"></tbody></table></div>
+      </section>
+    </section>
+
+    <footer><a href="index.html">بازگشت به سامانه دانشجو</a> · نسخه آزمایشی ۰.۵</footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
