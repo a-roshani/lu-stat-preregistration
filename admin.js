@@ -219,9 +219,16 @@ async function deleteCourse(id){
 
 function switchTab(tab){
   document.querySelectorAll('.admin-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  $('tabStudents').classList.toggle('hidden',tab!=='students'); $('tabCourses').classList.toggle('hidden',tab!=='courses'); $('tabDemand').classList.toggle('hidden',tab!=='demand'); $('tabOverlap').classList.toggle('hidden',tab!=='overlap'); $('tabScheduler').classList.toggle('hidden',tab!=='scheduler');
-  if(tab==='scheduler') refreshExportSummary();
-  if(tab!=='students') closeStudentEditor(); if(tab!=='courses') closeCourseEditor();
+  const panels={students:$('tabStudents'),courses:$('tabCourses'),demand:$('tabDemand'),overlap:$('tabOverlap'),scheduler:$('tabScheduler')};
+  Object.entries(panels).forEach(([name,panel])=>{ if(panel) panel.classList.toggle('hidden',name!==tab); });
+  if(tab==='scheduler'){
+    refreshExportSummary();
+    if(els.exportMessage && !state.students.length){
+      msg(els.exportMessage,'تب خروجی آماده است؛ اگر هنوز دانشجویی ثبت نشده باشد شمارنده‌ها صفر خواهند بود.','');
+    }
+  }
+  if(tab!=='students') closeStudentEditor();
+  if(tab!=='courses') closeCourseEditor();
 }
 
 document.querySelectorAll('.admin-tab').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
