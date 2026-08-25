@@ -2,6 +2,7 @@ const cfg = window.APP_CONFIG || {};
 const configured = cfg.SUPABASE_URL && cfg.SUPABASE_PUBLISHABLE_KEY && !cfg.SUPABASE_URL.includes('PASTE_') && !cfg.SUPABASE_PUBLISHABLE_KEY.includes('PASTE_');
 const client = configured ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY) : null;
 let allCourses = [];
+let allEntries = [];
 let editingExisting = false;
 
 const $ = (id) => document.getElementById(id);
@@ -24,9 +25,19 @@ function normalizeDigits(s=''){
     .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));
 }
 function faLevel(level){return level==='Graduate'?'کارشناسی ارشد':level==='PhD'?'دکتری':'کارشناسی';}
+function entryLabel(id){const e=allEntries.find(x=>String(x.id)===String(id)); return e ? (e.label_fa || e.id) : id;}
 function isRecommended(c){const e=els.entryYear.value; return e && (c.allowed_entries||[]).includes(e);}
 function selectedIds(){return [...document.querySelectorAll('.course-check:checked')].map(x=>x.value);}
 function updateCount(){els.selectedCount.textContent=`${selectedIds().length.toLocaleString('fa-IR')} درس انتخاب شده`;}
+
+function renderEntries(selected=''){
+  const active = allEntries.filter(e=>e.active!==false).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0) || String(a.id).localeCompare(String(b.id)));
+  els.entryYear.innerHTML = '<option value="">انتخاب کنید</option>' + active.map(e=>`<option value="${e.id}">${e.label_fa||e.id}</option>`).join('');
+  if(selected && !active.some(e=>String(e.id)===String(selected))){
+    const opt=document.createElement('option'); opt.value=selected; opt.textContent=selected+' (غیرفعال)'; els.entryYear.appendChild(opt);
+  }
+  if(selected) els.entryYear.value=selected;
+}
 
 function renderCourses(){
   const q=els.courseSearch.value.trim().toLowerCase();
@@ -38,25 +49,32 @@ function renderCourses(){
     if(q && !hay.includes(q)) continue;
     const lab=document.createElement('label');
     lab.className='course-card'+(isRecommended(c)?' recommended':'');
-    lab.innerHTML=`<input class="course-check" type="checkbox" value="${c.id}" ${selected.has(c.id)?'checked':''}><div class="course-main"><div class="course-name">${c.name_fa}</div><div class="course-meta"><span class="badge">${faLevel(c.level)}</span><span class="badge">${c.credits} واحد</span> ${c.instructor} · ورودی اصلی ${c.main_entry}</div></div>`;
+    const mainEntry=entryLabel(c.main_entry);
+    lab.innerHTML=`<input class="course-check" type="checkbox" value="${c.id}" ${selected.has(c.id)?'checked':''}><div class="course-main"><div class="course-name">${c.name_fa}</div><div class="course-meta"><span class="badge">${faLevel(c.level)}</span><span class="badge">${c.credits} واحد</span> ${c.instructor} · ورودی اصلی ${mainEntry}</div></div>`;
     els.courseList.appendChild(lab);
   }
   document.querySelectorAll('.course-check').forEach(x=>x.addEventListener('change',updateCount));
   updateCount();
 }
 
-async function loadCourses(){
+async function loadCatalog(){
   try{
     if(client){
-      const {data,error}=await client.from('courses').select('*').eq('active',true).order('name_fa');
-      if(error) throw error;
-      allCourses=data||[];
+      const [entryRes, courseRes] = await Promise.all([
+        client.from('entries').select('*').eq('active',true).order('sort_order').order('id'),
+        client.from('courses').select('*').eq('active',true).order('name_fa')
+      ]);
+      if(entryRes.error) throw entryRes.error;
+      if(courseRes.error) throw courseRes.error;
+      allEntries=entryRes.data||[];
+      allCourses=courseRes.data||[];
     } else {
-      const r=await fetch('courses_v42.json');
-      allCourses=await r.json();
+      const [er,cr]=await Promise.all([fetch('entries_master.json'),fetch('courses_v42.json')]);
+      allEntries=await er.json(); allCourses=await cr.json();
     }
+    renderEntries();
     renderCourses();
-  }catch(e){msg(els.formMessage,'خطا در دریافت فهرست دروس: '+e.message,'error');}
+  }catch(e){msg(els.formMessage,'خطا در دریافت فهرست ورودی‌ها/دروس: '+e.message,'error');}
 }
 
 function setView(view){
@@ -73,6 +91,7 @@ function clearForm({keepMessage=false}={}){
   editingExisting=false;
   els.studentNumber.readOnly=false;
   els.editBanner.classList.add('hidden');
+  renderEntries();
   document.querySelectorAll('.course-check').forEach(x=>x.checked=false);
   updateCount();
   if(!keepMessage) msg(els.formMessage);
@@ -84,8 +103,7 @@ async function loadExisting(){
   if(!client) return msg(els.lookupMessage,'ابتدا اتصال Supabase را در config.js تنظیم کنید.','error');
   const student=normalizeDigits(els.lookupStudentNumber.value.trim()), pin=normalizeDigits(els.lookupPin.value.trim());
   if(!student||!pin) return msg(els.lookupMessage,'شماره دانشجویی و کد ویرایش را وارد کنید.','error');
-  els.loadBtn.disabled=true;
-  msg(els.lookupMessage,'در حال بازیابی…');
+  els.loadBtn.disabled=true; msg(els.lookupMessage,'در حال بازیابی…');
   const {data,error}=await client.rpc('load_registration',{p_student_number:student,p_edit_pin:pin});
   els.loadBtn.disabled=false;
   if(error || !data || !data.ok) return msg(els.lookupMessage,'اطلاعات پیدا نشد یا کد ویرایش صحیح نیست.','error');
@@ -96,7 +114,7 @@ async function loadExisting(){
   els.lastName.value=r.last_name;
   els.studentNumber.value=r.student_number;
   els.studentNumber.readOnly=true;
-  els.entryYear.value=r.entry_year;
+  renderEntries(r.entry_year);
   els.editPin.value=pin;
   els.editPinConfirm.value=pin;
   renderCourses();
@@ -106,9 +124,8 @@ async function loadExisting(){
   els.submitBtn.textContent='ثبت تغییرات پیش‌ثبت‌نام';
   els.editBanner.textContent=`در حال ویرایش اطلاعات شماره دانشجویی ${r.student_number} هستید.`;
   els.editBanner.classList.remove('hidden');
-  msg(els.lookupMessage,'اطلاعات با موفقیت بازیابی شد.','ok');
-
   setView('register');
+  msg(els.formMessage,'اطلاعات قبلی شما بازیابی شد. پس از اصلاح، دکمه «ثبت تغییرات پیش‌ثبت‌نام» را بزنید.','ok');
   window.scrollTo({top:els.registrationView.offsetTop-12,behavior:'smooth'});
 }
 
@@ -118,13 +135,13 @@ async function submitRegistration(ev){
   const pin=normalizeDigits(els.editPin.value.trim()), pin2=normalizeDigits(els.editPinConfirm.value.trim()), student=normalizeDigits(els.studentNumber.value.trim());
   if(pin!==pin2) return msg(els.formMessage,'کد ویرایش و تکرار آن یکسان نیست.','error');
   if(!/^\d{4,8}$/.test(pin)) return msg(els.formMessage,'کد ویرایش باید ۴ تا ۸ رقم باشد.','error');
+  if(!els.entryYear.value) return msg(els.formMessage,'ورودی را انتخاب کنید.','error');
   const courses=selectedIds();
   if(!courses.length) return msg(els.formMessage,'حداقل یک درس را انتخاب کنید.','error');
 
   els.submitBtn.disabled=true;
   const oldLabel=els.submitBtn.textContent;
-  els.submitBtn.textContent='در حال ثبت…';
-  msg(els.formMessage);
+  els.submitBtn.textContent='در حال ثبت…'; msg(els.formMessage);
   const {data,error}=await client.rpc('save_registration',{
     p_student_number:student,
     p_first_name:els.firstName.value.trim(),
@@ -133,8 +150,7 @@ async function submitRegistration(ev){
     p_course_ids:courses,
     p_edit_pin:pin
   });
-  els.submitBtn.disabled=false;
-  els.submitBtn.textContent=oldLabel;
+  els.submitBtn.disabled=false; els.submitBtn.textContent=oldLabel;
   if(error || !data || !data.ok) return msg(els.formMessage,(data&&data.message)||error?.message||'ثبت اطلاعات انجام نشد.','error');
 
   const stamp=new Date().toLocaleString('fa-IR');
@@ -145,10 +161,7 @@ async function submitRegistration(ev){
   window.scrollTo({top:els.formMessage.offsetTop-140,behavior:'smooth'});
 }
 
-els.registerModeBtn.addEventListener('click',()=>{
-  if(editingExisting){ clearForm(); }
-  setView('register');
-});
+els.registerModeBtn.addEventListener('click',()=>{ if(editingExisting){ clearForm(); } setView('register'); });
 els.editModeBtn.addEventListener('click',()=>setView('edit'));
 els.loadBtn.addEventListener('click',loadExisting);
 els.entryYear.addEventListener('change',renderCourses);
@@ -156,12 +169,7 @@ els.courseSearch.addEventListener('input',renderCourses);
 els.resetBtn.addEventListener('click',()=>clearForm());
 els.form.addEventListener('submit',submitRegistration);
 
-if(configured){
-  els.dbStatus.textContent='پایگاه داده متصل';
-  els.dbStatus.classList.add('ok');
-}else{
-  els.dbStatus.textContent='نیازمند تنظیم اتصال';
-  els.dbStatus.classList.add('bad');
-}
+if(configured){els.dbStatus.textContent='پایگاه داده متصل';els.dbStatus.classList.add('ok');}
+else{els.dbStatus.textContent='نیازمند تنظیم اتصال';els.dbStatus.classList.add('bad');}
 setView('register');
-loadCourses();
+loadCatalog();
