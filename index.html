@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#17324d" />
   <title>سامانه پیش‌ثبت‌نام دروس گروه آمار</title>
-  <link rel="stylesheet" href="styles.css?v=1.0.0" />
+  <link rel="stylesheet" href="styles.css?v=1.1.0" />
 </head>
 <body>
   <main class="shell">
@@ -21,6 +21,13 @@
     <section class="card notice">
       <strong>نکته:</strong> پیش‌ثبت‌نام به معنی ثبت قطعی درس در سامانه گلستان نیست. در صورت نیاز می‌توانید بعداً با شماره دانشجویی و کد ویرایش، انتخاب‌های خود را اصلاح کنید.
     </section>
+
+    <section id="closedNotice" class="card closed-site-card hidden">
+      <h2>پیش‌ثبت‌نام غیرفعال است</h2>
+      <p id="closedNoticeText">پیش ثبت نام تا شروع ترم آینده توسط ادمین غیر فعال شده است و امکان ثبت یا ویرایش وجود ندارد.</p>
+    </section>
+
+    <div id="studentInteractiveArea">
 
     <nav class="mode-switch card" aria-label="انتخاب نوع عملیات">
       <button id="registerModeBtn" class="mode-btn active" type="button">ثبت پیش‌ثبت‌نام</button>
@@ -83,15 +90,17 @@
       </form>
     </section>
 
+    </div>
+
     <footer>
-      سامانه پیش‌ثبت‌نام گروه آمار · نسخه ۱.۰
+      سامانه پیش‌ثبت‌نام گروه آمار · نسخه ۱.۱
       <span class="footer-sep">·</span>
       <a href="admin.html">ورود مدیر</a>
     </footer>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=1.0.0"></script>
-  <script src="app.js?v=1.0.0"></script>
+  <script src="config.js?v=1.1.0"></script>
+  <script src="app.js?v=1.1.0"></script>
 </body>
 </html>

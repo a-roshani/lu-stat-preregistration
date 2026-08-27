@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#17324d" />
   <title>مدیریت پیش‌ثبت‌نام دروس</title>
-  <link rel="stylesheet" href="styles.css?v=1.0.0" />
+  <link rel="stylesheet" href="styles.css?v=1.1.0" />
 </head>
 <body>
   <main class="shell admin-shell">
@@ -13,7 +13,7 @@
       <div>
         <div class="eyebrow">دانشگاه لرستان · گروه آمار</div>
         <h1>مدیریت سامانه پیش‌ثبت‌نام</h1>
-        <p>مدیریت دانشجویان، ورودی‌ها، فهرست دروس، تقاضا، هم‌پوشانی انتخاب‌ها و خروجی برنامه‌ریز.</p>
+        <p>University Scheduler مرجع اصلی درس‌ها و ورودی‌هاست. این پنل کاتالوگ را دریافت می‌کند، پیش‌ثبت‌نام را کنترل می‌کند و خروجی دانشجویان را به برنامه‌ریز برمی‌گرداند.</p>
       </div>
       <div>
         <div id="adminUser" class="admin-user"></div>
@@ -33,6 +33,17 @@
     </section>
 
     <section id="adminApp" class="hidden">
+      <section class="card registration-status-card">
+        <div class="section-heading"><div><h2>وضعیت سامانه</h2></div><small id="catalogStatusText">کاتالوگ هنوز وارد نشده است.</small></div>
+        <div class="status-control-row">
+          <div>
+            <span id="registrationStatusBadge" class="status-badge inactive">غیرفعال</span>
+            <div class="help">وقتی سامانه بسته باشد، دانشجو نه می‌تواند ثبت‌نام کند و نه اطلاعات قبلی را ویرایش کند.</div>
+          </div>
+          <button id="toggleRegistrationBtn" class="primary" type="button">فعال کردن پیش‌ثبت‌نام</button>
+        </div>
+      </section>
+
       <div class="stats-grid stats-grid-five">
         <div class="stat-card"><div class="stat-label">دانشجوی ثبت‌شده</div><div id="statStudents" class="stat-value">۰</div></div>
         <div class="stat-card"><div class="stat-label">کل انتخاب درس</div><div id="statSelections" class="stat-value">۰</div></div>
@@ -43,12 +54,11 @@
 
       <nav class="card admin-tabs">
         <button class="admin-tab active" data-tab="students" type="button">دانشجویان</button>
-        <button class="admin-tab" data-tab="courses" type="button">مدیریت دروس</button>
-        <button class="admin-tab" data-tab="entries" type="button">مدیریت ورودی‌ها</button>
+        <button class="admin-tab" data-tab="catalog" type="button">کاتالوگ آموزشی</button>
         <button class="admin-tab" data-tab="demand" type="button">تقاضای دروس</button>
         <button class="admin-tab" data-tab="overlap" type="button">هم‌پوشانی دروس</button>
         <button class="admin-tab" data-tab="scheduler" type="button">خروجی برنامه‌ریز</button>
-        <button class="admin-tab" data-tab="system" type="button">شروع دوره جدید</button>
+        <button class="admin-tab" data-tab="system" type="button">کنترل سامانه</button>
       </nav>
 
       <section id="tabStudents" class="card admin-panel">
@@ -75,50 +85,25 @@
         <div id="editorMessage" class="message"></div>
       </section>
 
-      <section id="tabCourses" class="card admin-panel hidden">
-        <div class="section-heading"><div><h2>مدیریت دروس قابل نمایش به دانشجو</h2></div><small>افزودن، ویرایش، غیرفعال‌سازی یا حذف کامل</small></div>
-        <div class="admin-toolbar"><input id="courseAdminSearch" type="search" placeholder="جست‌وجوی درس، استاد، شناسه یا ورودی…" /><button id="newCourseBtn" class="primary" type="button">افزودن درس جدید</button></div>
-        <div class="notice catalog-notice">شناسه داخلی درس، پل ارتباطی با University Scheduler است. شناسه ۳۰ درس اولیه دقیقاً با Scheduler هماهنگ است. اگر درس جدید اضافه می‌کنی، بهتر است همان شناسه را در Scheduler هم استفاده کنی؛ در غیر این صورت برنامه‌ریز هنگام Import آن را به‌عنوان درس تطبیق‌نیافته گزارش می‌کند.</div>
-        <p class="help">درس غیرفعال برای دانشجویان جدید نمایش داده نمی‌شود، اما انتخاب‌های قبلی آن حفظ می‌شود. حذف کامل، درس را از انتخاب دانشجوها نیز حذف می‌کند.</p>
-        <div class="table-wrap"><table class="data-table courses-admin-table"><thead><tr><th>شناسه</th><th>درس</th><th>استاد</th><th>واحد</th><th>مقطع</th><th>ورودی اصلی</th><th>ورودی‌های مجاز</th><th>خارج از چارت</th><th>وضعیت</th><th>متقاضی</th><th>عملیات</th></tr></thead><tbody id="coursesTableBody"></tbody></table></div>
-      </section>
-
-      <section id="courseEditor" class="card editor-card hidden">
-        <div class="section-heading"><div><h2 id="courseEditorTitle">افزودن درس جدید</h2></div><small id="courseEditorId"></small></div>
+      <section id="tabCatalog" class="card admin-panel hidden">
+        <div class="section-heading"><div><h2>کاتالوگ آموزشی از University Scheduler</h2></div><small>فقط خواندنی در سایت؛ مرجع اصلی برنامه‌ریز است</small></div>
+        <div class="notice catalog-notice">ابتدا درس‌ها، استاد، واحد، مقطع و ورودی‌ها را در University Scheduler تعریف کن. سپس فایل «کاتالوگ پیش‌ثبت‌نام» را از برنامه‌ریز بگیر و اینجا وارد کن.</div>
         <div class="grid two">
-          <label>شناسه هماهنگ‌سازی با Scheduler<input id="courseSyncId" placeholder="مثلاً Probability_II" /></label>
-          <label>نام درس<input id="courseName" /></label>
-          <label>استاد درس<input id="courseInstructor" /></label>
-          <label>تعداد واحد<select id="courseCredits"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></label>
-          <label>مقطع<select id="courseLevel"><option value="Undergraduate">کارشناسی</option><option value="Graduate">کارشناسی ارشد</option><option value="PhD">دکتری</option></select></label>
-          <label>ورودی اصلی<select id="courseMainEntry"></select></label>
+          <label>فایل کاتالوگ Scheduler<input id="catalogFile" type="file" accept="application/json,.json" /></label>
+          <div class="catalog-current-box">
+            <div class="stat-label">کاتالوگ فعلی</div>
+            <strong id="currentCatalogId">—</strong>
+            <div id="currentCatalogTime" class="help">هنوز کاتالوگی وارد نشده است.</div>
+          </div>
         </div>
-        <h3>ورودی‌های مجاز</h3>
-        <p class="help">این فهرست از «مدیریت ورودی‌ها» می‌آید. دانشجو همچنان می‌تواند سایر دروس فعال را نیز انتخاب کند.</p>
-        <div id="courseAllowedEntries" class="entry-check-grid"></div>
-        <div class="course-flags"><label class="check-line"><input id="courseOutOfChart" type="checkbox" /> درس خارج از چارت است</label><label class="check-line"><input id="courseActive" type="checkbox" checked /> درس فعال است و برای دانشجو نمایش داده شود</label></div>
-        <div class="actions"><button id="saveCourseBtn" class="primary" type="button">ثبت درس</button><button id="cancelCourseBtn" class="secondary" type="button">انصراف</button></div>
-        <div id="courseEditorMessage" class="message"></div>
-      </section>
+        <div id="catalogPreview" class="catalog-preview hidden"></div>
+        <div class="actions"><button id="applyCatalogBtn" class="primary" type="button" disabled>تأیید و اعمال کاتالوگ</button></div>
+        <div id="catalogMessage" class="message"></div>
 
-      <section id="tabEntries" class="card admin-panel hidden">
-        <div class="section-heading"><div><h2>مدیریت ورودی‌های دانشجویی</h2></div><small>فهرست کشویی ورودی در فرم دانشجو و تنظیمات درس</small></div>
-        <div class="admin-toolbar"><input id="entryAdminSearch" type="search" placeholder="جست‌وجوی شناسه یا عنوان ورودی…" /><button id="newEntryBtn" class="primary" type="button">افزودن ورودی جدید</button></div>
-        <div class="notice catalog-notice">شناسه ورودی نیز برای هماهنگی با Scheduler مهم است؛ نمونه‌ها: 1405، MSc_1405 و PhD_1405. برای ورودی جدید بهتر است همان شناسه در Scheduler هم وجود داشته باشد.</div>
-        <div class="table-wrap"><table class="data-table"><thead><tr><th>شناسه</th><th>عنوان نمایشی</th><th>مقطع</th><th>ترتیب</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="entriesTableBody"></tbody></table></div>
-      </section>
-
-      <section id="entryEditor" class="card editor-card hidden">
-        <div class="section-heading"><div><h2 id="entryEditorTitle">افزودن ورودی جدید</h2></div><small id="entryEditorHint"></small></div>
-        <div class="grid two">
-          <label>شناسه ورودی<input id="entryId" placeholder="مثلاً 1406 یا MSc_1406" /></label>
-          <label>عنوان نمایشی<input id="entryLabel" placeholder="مثلاً کارشناسی ۱۴۰۶" /></label>
-          <label>مقطع<select id="entryLevel"><option value="Undergraduate">کارشناسی</option><option value="Graduate">کارشناسی ارشد</option><option value="PhD">دکتری</option></select></label>
-          <label>ترتیب نمایش<input id="entrySortOrder" type="number" min="0" step="1" value="10" /></label>
-        </div>
-        <label class="check-line" style="margin-top:16px"><input id="entryActive" type="checkbox" checked /> ورودی فعال باشد و برای دانشجو نمایش داده شود</label>
-        <div class="actions"><button id="saveEntryBtn" class="primary" type="button">ثبت ورودی</button><button id="cancelEntryBtn" class="secondary" type="button">انصراف</button></div>
-        <div id="entryEditorMessage" class="message"></div>
+        <h3 style="margin-top:28px">ورودی‌های فعلی</h3>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>شناسه</th><th>عنوان</th><th>مقطع</th><th>ترتیب</th></tr></thead><tbody id="catalogEntriesBody"></tbody></table></div>
+        <h3 style="margin-top:22px">درس‌های فعلی</h3>
+        <div class="table-wrap"><table class="data-table courses-admin-table"><thead><tr><th>شناسه</th><th>درس</th><th>استاد</th><th>واحد</th><th>مقطع</th><th>ورودی اصلی</th><th>ورودی‌های مجاز</th><th>خارج از چارت</th></tr></thead><tbody id="catalogCoursesBody"></tbody></table></div>
       </section>
 
       <section id="tabDemand" class="card admin-panel hidden">
@@ -133,35 +118,39 @@
       </section>
 
       <section id="tabScheduler" class="card admin-panel hidden">
-        <div class="section-heading"><div><h2>خروجی برای University Scheduler</h2></div><small>Snapshot از پیش‌ثبت‌نام و کاتالوگ فعلی</small></div>
+        <div class="section-heading"><div><h2>خروجی برای University Scheduler</h2></div><small>Snapshot نهایی پیش‌ثبت‌نام</small></div>
         <div class="export-info-grid">
           <div class="export-info"><span>دانشجو</span><strong id="exportStudents">۰</strong></div>
           <div class="export-info"><span>انتخاب درس</span><strong id="exportSelections">۰</strong></div>
           <div class="export-info"><span>جفت درس دارای اشتراک</span><strong id="exportOverlaps">۰</strong></div>
-          <div class="export-info"><span>زمان تهیه خروجی</span><strong id="exportTimestamp">—</strong></div>
+          <div class="export-info"><span>کاتالوگ</span><strong id="exportCatalogId">—</strong></div>
         </div>
-        <div class="notice export-notice">فایل خروجی شامل شناسه‌های پایدار درس و ورودی است. Scheduler قبل از اعمال تداخل‌ها، سازگاری کاتالوگ سایت با کاتالوگ خودش را بررسی می‌کند و موارد نامنطبق را هشدار می‌دهد.</div>
-        <div class="actions"><button id="downloadSchedulerBtn" class="primary" type="button">دانلود فایل مخصوص University Scheduler</button><button id="downloadBackupBtn" class="secondary" type="button">دانلود پشتیبان کامل داده‌های فعلی</button></div>
+        <div class="notice export-notice">این فایل شامل اطلاعات دانشجویان است و برای Import مستقیم در University Scheduler ساخته می‌شود. آن را روی GitHub عمومی قرار نده.</div>
+        <div class="actions"><button id="downloadSchedulerBtn" class="primary" type="button">دانلود فایل مخصوص University Scheduler</button></div>
         <div id="exportMessage" class="message"></div>
       </section>
 
       <section id="tabSystem" class="card admin-panel hidden">
-        <div class="section-heading"><div><h2>شروع دوره جدید پیش‌ثبت‌نام</h2></div><small>پاک‌سازی ثبت‌نام دانشجویان بدون دست‌زدن به کاتالوگ</small></div>
-        <div class="notice">این عملیات فقط اطلاعات دانشجویان و انتخاب درس‌های آنها را پاک می‌کند. دروس، ورودی‌ها، تنظیمات سایت و حساب مدیر باقی می‌مانند.</div>
+        <div class="section-heading"><div><h2>کنترل سامانه</h2></div><small>باز/بسته کردن پیش‌ثبت‌نام و شروع دوره جدید</small></div>
+        <h3>پیام هنگام بسته بودن سامانه</h3>
+        <label>متن پیام<input id="closedMessageInput" value="پیش ثبت نام تا شروع ترم آینده توسط ادمین غیر فعال شده است و امکان ثبت یا ویرایش وجود ندارد." /></label>
+        <div class="actions"><button id="saveStatusBtn" class="secondary" type="button">ذخیره وضعیت و پیام</button></div>
+        <div id="statusMessage" class="message"></div>
+
         <div class="danger-zone reset-card">
-          <h2>حذف همه اطلاعات پیش‌ثبت‌نام دانشجویان</h2>
-          <p class="help">قبل از حذف، برنامه به‌طور خودکار فایل پشتیبان JSON را دانلود می‌کند. سپس برای تأیید باید عبارت مشخص‌شده را تایپ کنی.</p>
-          <button id="clearAllStudentsBtn" class="danger-button" type="button">شروع دوره جدید و حذف همه دانشجوها</button>
+          <h2>حذف همه اطلاعات دانشجویان</h2>
+          <p class="help">این عملیات فقط دانشجویان و انتخاب درس‌های آن‌ها را حذف می‌کند و سامانه را غیرفعال می‌کند. کاتالوگ و حساب مدیر باقی می‌مانند. هیچ فایل پشتیبانی ساخته نمی‌شود.</p>
+          <button id="clearAllStudentsBtn" class="danger-button" type="button">حذف همه اطلاعات دانشجویان</button>
           <div id="systemMessage" class="message"></div>
         </div>
       </section>
     </section>
 
-    <footer><a href="index.html">بازگشت به سامانه دانشجو</a> · نسخه ۱.۰</footer>
+    <footer><a href="index.html">بازگشت به سامانه دانشجو</a> · نسخه ۱.۱</footer>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=1.0.0"></script>
-  <script src="admin.js?v=1.0.0"></script>
+  <script src="config.js?v=1.1.0"></script>
+  <script src="admin.js?v=1.1.0"></script>
 </body>
 </html>

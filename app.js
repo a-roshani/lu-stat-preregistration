@@ -1,175 +1,23 @@
 const cfg = window.APP_CONFIG || {};
 const configured = cfg.SUPABASE_URL && cfg.SUPABASE_PUBLISHABLE_KEY && !cfg.SUPABASE_URL.includes('PASTE_') && !cfg.SUPABASE_PUBLISHABLE_KEY.includes('PASTE_');
 const client = configured ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY) : null;
-let allCourses = [];
-let allEntries = [];
-let editingExisting = false;
-
-const $ = (id) => document.getElementById(id);
-const els = {
-  dbStatus:$('dbStatus'), registerModeBtn:$('registerModeBtn'), editModeBtn:$('editModeBtn'),
-  registrationView:$('registrationView'), editView:$('editView'), editLoader:$('editLoader'), editBanner:$('editBanner'),
-  lookupStudentNumber:$('lookupStudentNumber'), lookupPin:$('lookupPin'), loadBtn:$('loadBtn'), lookupMessage:$('lookupMessage'),
-  form:$('registrationForm'), firstName:$('firstName'), lastName:$('lastName'), studentNumber:$('studentNumber'), entryYear:$('entryYear'),
-  courseSearch:$('courseSearch'), courseList:$('courseList'), selectedCount:$('selectedCount'), editPin:$('editPin'), editPinConfirm:$('editPinConfirm'),
-  submitBtn:$('submitBtn'), resetBtn:$('resetBtn'), formMessage:$('formMessage')
-};
-
-function msg(el, text='', kind='') {
-  el.textContent = text;
-  el.className = 'message' + (text ? ' show' : '') + (kind ? ' ' + kind : '');
-}
-function normalizeDigits(s=''){
-  return String(s)
-    .replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
-    .replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-}
+let allCourses=[], allEntries=[], editingExisting=false, registrationOpen=false;
+const $=id=>document.getElementById(id);
+const els={dbStatus:$('dbStatus'),closedNotice:$('closedNotice'),closedNoticeText:$('closedNoticeText'),studentInteractiveArea:$('studentInteractiveArea'),registerModeBtn:$('registerModeBtn'),editModeBtn:$('editModeBtn'),registrationView:$('registrationView'),editView:$('editView'),editLoader:$('editLoader'),editBanner:$('editBanner'),lookupStudentNumber:$('lookupStudentNumber'),lookupPin:$('lookupPin'),loadBtn:$('loadBtn'),lookupMessage:$('lookupMessage'),form:$('registrationForm'),firstName:$('firstName'),lastName:$('lastName'),studentNumber:$('studentNumber'),entryYear:$('entryYear'),courseSearch:$('courseSearch'),courseList:$('courseList'),selectedCount:$('selectedCount'),editPin:$('editPin'),editPinConfirm:$('editPinConfirm'),submitBtn:$('submitBtn'),resetBtn:$('resetBtn'),formMessage:$('formMessage')};
+function msg(el,text='',kind=''){if(!el)return;el.textContent=text;el.className='message'+(text?' show':'')+(kind?' '+kind:'');}
+function normalizeDigits(s=''){return String(s).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d));}
 function faLevel(level){return level==='Graduate'?'کارشناسی ارشد':level==='PhD'?'دکتری':'کارشناسی';}
-function entryLabel(id){const e=allEntries.find(x=>String(x.id)===String(id)); return e ? (e.label_fa || e.id) : id;}
-function isRecommended(c){const e=els.entryYear.value; return e && (c.allowed_entries||[]).includes(e);}
+function entryLabel(id){const e=allEntries.find(x=>String(x.id)===String(id));return e?(e.label_fa||e.id):id;}
+function isRecommended(c){const e=els.entryYear.value;return e&&(c.allowed_entries||[]).includes(e);}
 function selectedIds(){return [...document.querySelectorAll('.course-check:checked')].map(x=>x.value);}
 function updateCount(){els.selectedCount.textContent=`${selectedIds().length.toLocaleString('fa-IR')} درس انتخاب شده`;}
-
-function renderEntries(selected=''){
-  const active = allEntries.filter(e=>e.active!==false).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0) || String(a.id).localeCompare(String(b.id)));
-  els.entryYear.innerHTML = '<option value="">انتخاب کنید</option>' + active.map(e=>`<option value="${e.id}">${e.label_fa||e.id}</option>`).join('');
-  if(selected && !active.some(e=>String(e.id)===String(selected))){
-    const opt=document.createElement('option'); opt.value=selected; opt.textContent=selected+' (غیرفعال)'; els.entryYear.appendChild(opt);
-  }
-  if(selected) els.entryYear.value=selected;
-}
-
-function renderCourses(){
-  const q=els.courseSearch.value.trim().toLowerCase();
-  const selected = new Set(selectedIds());
-  const sorted=[...allCourses].sort((a,b)=>Number(isRecommended(b))-Number(isRecommended(a)) || a.name_fa.localeCompare(b.name_fa,'fa'));
-  els.courseList.innerHTML='';
-  for(const c of sorted){
-    const hay=`${c.name_fa} ${c.instructor} ${c.id}`.toLowerCase();
-    if(q && !hay.includes(q)) continue;
-    const lab=document.createElement('label');
-    lab.className='course-card'+(isRecommended(c)?' recommended':'');
-    const mainEntry=entryLabel(c.main_entry);
-    lab.innerHTML=`<input class="course-check" type="checkbox" value="${c.id}" ${selected.has(c.id)?'checked':''}><div class="course-main"><div class="course-name">${c.name_fa}</div><div class="course-meta"><span class="badge">${faLevel(c.level)}</span><span class="badge">${c.credits} واحد</span> ${c.instructor} · ورودی اصلی ${mainEntry}</div></div>`;
-    els.courseList.appendChild(lab);
-  }
-  document.querySelectorAll('.course-check').forEach(x=>x.addEventListener('change',updateCount));
-  updateCount();
-}
-
-async function loadCatalog(){
-  try{
-    if(client){
-      const [entryRes, courseRes] = await Promise.all([
-        client.from('entries').select('*').eq('active',true).order('sort_order').order('id'),
-        client.from('courses').select('*').eq('active',true).order('name_fa')
-      ]);
-      if(entryRes.error) throw entryRes.error;
-      if(courseRes.error) throw courseRes.error;
-      allEntries=entryRes.data||[];
-      allCourses=courseRes.data||[];
-    } else {
-      const [er,cr]=await Promise.all([fetch('entries_master.json'),fetch('courses_v42.json')]);
-      allEntries=await er.json(); allCourses=await cr.json();
-    }
-    renderEntries();
-    renderCourses();
-  }catch(e){msg(els.formMessage,'خطا در دریافت فهرست ورودی‌ها/دروس: '+e.message,'error');}
-}
-
-function setView(view){
-  const isEdit = view === 'edit';
-  els.registerModeBtn.classList.toggle('active', !isEdit);
-  els.editModeBtn.classList.toggle('active', isEdit);
-  els.registrationView.classList.toggle('hidden', isEdit);
-  els.editView.classList.toggle('hidden', !isEdit);
-  msg(els.lookupMessage);
-}
-
-function clearForm({keepMessage=false}={}){
-  els.form.reset();
-  editingExisting=false;
-  els.studentNumber.readOnly=false;
-  els.editBanner.classList.add('hidden');
-  renderEntries();
-  document.querySelectorAll('.course-check').forEach(x=>x.checked=false);
-  updateCount();
-  if(!keepMessage) msg(els.formMessage);
-  renderCourses();
-  els.submitBtn.textContent='ثبت پیش‌ثبت‌نام';
-}
-
-async function loadExisting(){
-  if(!client) return msg(els.lookupMessage,'ابتدا اتصال Supabase را در config.js تنظیم کنید.','error');
-  const student=normalizeDigits(els.lookupStudentNumber.value.trim()), pin=normalizeDigits(els.lookupPin.value.trim());
-  if(!student||!pin) return msg(els.lookupMessage,'شماره دانشجویی و کد ویرایش را وارد کنید.','error');
-  els.loadBtn.disabled=true; msg(els.lookupMessage,'در حال بازیابی…');
-  const {data,error}=await client.rpc('load_registration',{p_student_number:student,p_edit_pin:pin});
-  els.loadBtn.disabled=false;
-  if(error || !data || !data.ok) return msg(els.lookupMessage,'اطلاعات پیدا نشد یا کد ویرایش صحیح نیست.','error');
-
-  const r=data.registration;
-  editingExisting=true;
-  els.firstName.value=r.first_name;
-  els.lastName.value=r.last_name;
-  els.studentNumber.value=r.student_number;
-  els.studentNumber.readOnly=true;
-  renderEntries(r.entry_year);
-  els.editPin.value=pin;
-  els.editPinConfirm.value=pin;
-  renderCourses();
-  const wanted=new Set(data.course_ids||[]);
-  document.querySelectorAll('.course-check').forEach(x=>x.checked=wanted.has(x.value));
-  updateCount();
-  els.submitBtn.textContent='ثبت تغییرات پیش‌ثبت‌نام';
-  els.editBanner.textContent=`در حال ویرایش اطلاعات شماره دانشجویی ${r.student_number} هستید.`;
-  els.editBanner.classList.remove('hidden');
-  setView('register');
-  msg(els.formMessage,'اطلاعات قبلی شما بازیابی شد. پس از اصلاح، دکمه «ثبت تغییرات پیش‌ثبت‌نام» را بزنید.','ok');
-  window.scrollTo({top:els.registrationView.offsetTop-12,behavior:'smooth'});
-}
-
-async function submitRegistration(ev){
-  ev.preventDefault();
-  if(!client) return msg(els.formMessage,'اتصال پایگاه داده هنوز تنظیم نشده است. مراحل README را انجام دهید.','error');
-  const pin=normalizeDigits(els.editPin.value.trim()), pin2=normalizeDigits(els.editPinConfirm.value.trim()), student=normalizeDigits(els.studentNumber.value.trim());
-  if(pin!==pin2) return msg(els.formMessage,'کد ویرایش و تکرار آن یکسان نیست.','error');
-  if(!/^\d{4,8}$/.test(pin)) return msg(els.formMessage,'کد ویرایش باید ۴ تا ۸ رقم باشد.','error');
-  if(!els.entryYear.value) return msg(els.formMessage,'ورودی را انتخاب کنید.','error');
-  const courses=selectedIds();
-  if(!courses.length) return msg(els.formMessage,'حداقل یک درس را انتخاب کنید.','error');
-
-  els.submitBtn.disabled=true;
-  const oldLabel=els.submitBtn.textContent;
-  els.submitBtn.textContent='در حال ثبت…'; msg(els.formMessage);
-  const {data,error}=await client.rpc('save_registration',{
-    p_student_number:student,
-    p_first_name:els.firstName.value.trim(),
-    p_last_name:els.lastName.value.trim(),
-    p_entry_year:els.entryYear.value,
-    p_course_ids:courses,
-    p_edit_pin:pin
-  });
-  els.submitBtn.disabled=false; els.submitBtn.textContent=oldLabel;
-  if(error || !data || !data.ok) return msg(els.formMessage,(data&&data.message)||error?.message||'ثبت اطلاعات انجام نشد.','error');
-
-  const stamp=new Date().toLocaleString('fa-IR');
-  const successText = editingExisting
-    ? `تغییرات شما با موفقیت ثبت شد.\nزمان ثبت: ${stamp}\nبرای ویرایش مجدد در آینده، از بخش «ویرایش پیش‌ثبت‌نام قبلی» و همان کد ویرایش استفاده کنید.`
-    : `اطلاعات شما با موفقیت ثبت شد.\nزمان ثبت: ${stamp}\nبرای ویرایش بعدی، از بخش «ویرایش پیش‌ثبت‌نام قبلی» وارد شوید و شماره دانشجویی و کد ویرایش خود را وارد کنید.\nکد ویرایش خود را نزد خود نگه دارید.`;
-  msg(els.formMessage,successText,'ok');
-  window.scrollTo({top:els.formMessage.offsetTop-140,behavior:'smooth'});
-}
-
-els.registerModeBtn.addEventListener('click',()=>{ if(editingExisting){ clearForm(); } setView('register'); });
-els.editModeBtn.addEventListener('click',()=>setView('edit'));
-els.loadBtn.addEventListener('click',loadExisting);
-els.entryYear.addEventListener('change',renderCourses);
-els.courseSearch.addEventListener('input',renderCourses);
-els.resetBtn.addEventListener('click',()=>clearForm());
-els.form.addEventListener('submit',submitRegistration);
-
-if(configured){els.dbStatus.textContent='پایگاه داده متصل';els.dbStatus.classList.add('ok');}
-else{els.dbStatus.textContent='نیازمند تنظیم اتصال';els.dbStatus.classList.add('bad');}
-setView('register');
-loadCatalog();
+function renderEntries(selected=''){const active=allEntries.filter(e=>e.active!==false).sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0)||String(a.id).localeCompare(String(b.id)));els.entryYear.innerHTML='<option value="">انتخاب کنید</option>'+active.map(e=>`<option value="${e.id}">${e.label_fa||e.id}</option>`).join('');if(selected&&!active.some(e=>String(e.id)===String(selected))){const opt=document.createElement('option');opt.value=selected;opt.textContent=selected+' (غیرفعال)';els.entryYear.appendChild(opt);}if(selected)els.entryYear.value=selected;}
+function renderCourses(){const q=els.courseSearch.value.trim().toLowerCase(),selected=new Set(selectedIds()),sorted=[...allCourses].sort((a,b)=>Number(isRecommended(b))-Number(isRecommended(a))||a.name_fa.localeCompare(b.name_fa,'fa'));els.courseList.innerHTML='';for(const c of sorted){const hay=`${c.name_fa} ${c.instructor} ${c.id}`.toLowerCase();if(q&&!hay.includes(q))continue;const lab=document.createElement('label');lab.className='course-card'+(isRecommended(c)?' recommended':'');lab.innerHTML=`<input class="course-check" type="checkbox" value="${c.id}" ${selected.has(c.id)?'checked':''}><div class="course-main"><div class="course-name">${c.name_fa}</div><div class="course-meta"><span class="badge">${faLevel(c.level)}</span><span class="badge">${c.credits} واحد</span> ${c.instructor} · ورودی اصلی ${entryLabel(c.main_entry)}</div></div>`;els.courseList.appendChild(lab);}document.querySelectorAll('.course-check').forEach(x=>x.addEventListener('change',updateCount));updateCount();}
+async function loadStatus(){if(!client){registrationOpen=false;return;}const {data,error}=await client.rpc('registration_status');if(error)throw error;registrationOpen=!!data?.open;if(registrationOpen){els.closedNotice.classList.add('hidden');els.studentInteractiveArea.classList.remove('hidden');}else{els.closedNoticeText.textContent=data?.message||'پیش ثبت نام تا شروع ترم آینده توسط ادمین غیر فعال شده است و امکان ثبت یا ویرایش وجود ندارد.';els.closedNotice.classList.remove('hidden');els.studentInteractiveArea.classList.add('hidden');}}
+async function loadCatalog(){try{if(client){const [entryRes,courseRes]=await Promise.all([client.from('entries').select('*').eq('active',true).order('sort_order').order('id'),client.from('courses').select('*').eq('active',true).order('name_fa')]);if(entryRes.error)throw entryRes.error;if(courseRes.error)throw courseRes.error;allEntries=entryRes.data||[];allCourses=courseRes.data||[];}else{allEntries=[];allCourses=[];}renderEntries();renderCourses();}catch(e){msg(els.formMessage,'خطا در دریافت فهرست ورودی‌ها/دروس: '+e.message,'error');}}
+function setView(view){const isEdit=view==='edit';els.registerModeBtn.classList.toggle('active',!isEdit);els.editModeBtn.classList.toggle('active',isEdit);els.registrationView.classList.toggle('hidden',isEdit);els.editView.classList.toggle('hidden',!isEdit);msg(els.lookupMessage);}
+function clearForm({keepMessage=false}={}){els.form.reset();editingExisting=false;els.studentNumber.readOnly=false;els.editBanner.classList.add('hidden');renderEntries();document.querySelectorAll('.course-check').forEach(x=>x.checked=false);updateCount();if(!keepMessage)msg(els.formMessage);renderCourses();els.submitBtn.textContent='ثبت پیش‌ثبت‌نام';}
+async function loadExisting(){if(!registrationOpen)return msg(els.lookupMessage,'پیش‌ثبت‌نام در حال حاضر غیرفعال است.','error');const student=normalizeDigits(els.lookupStudentNumber.value.trim()),pin=normalizeDigits(els.lookupPin.value.trim());if(!student||!pin)return msg(els.lookupMessage,'شماره دانشجویی و کد ویرایش را وارد کنید.','error');els.loadBtn.disabled=true;msg(els.lookupMessage,'در حال بازیابی…');const {data,error}=await client.rpc('load_registration',{p_student_number:student,p_edit_pin:pin});els.loadBtn.disabled=false;if(error||!data||!data.ok)return msg(els.lookupMessage,data?.message||'اطلاعات پیدا نشد یا کد ویرایش صحیح نیست.','error');const r=data.registration;editingExisting=true;els.firstName.value=r.first_name;els.lastName.value=r.last_name;els.studentNumber.value=r.student_number;els.studentNumber.readOnly=true;renderEntries(r.entry_year);els.editPin.value=pin;els.editPinConfirm.value=pin;renderCourses();const wanted=new Set(data.course_ids||[]);document.querySelectorAll('.course-check').forEach(x=>x.checked=wanted.has(x.value));updateCount();els.submitBtn.textContent='ثبت تغییرات پیش‌ثبت‌نام';els.editBanner.textContent=`در حال ویرایش اطلاعات شماره دانشجویی ${r.student_number} هستید.`;els.editBanner.classList.remove('hidden');setView('register');msg(els.formMessage,'اطلاعات قبلی شما بازیابی شد. پس از اصلاح، دکمه «ثبت تغییرات پیش‌ثبت‌نام» را بزنید.','ok');window.scrollTo({top:els.registrationView.offsetTop-12,behavior:'smooth'});}
+async function submitRegistration(ev){ev.preventDefault();if(!registrationOpen)return msg(els.formMessage,'پیش‌ثبت‌نام در حال حاضر غیرفعال است.','error');const pin=normalizeDigits(els.editPin.value.trim()),pin2=normalizeDigits(els.editPinConfirm.value.trim()),student=normalizeDigits(els.studentNumber.value.trim());if(pin!==pin2)return msg(els.formMessage,'کد ویرایش و تکرار آن یکسان نیست.','error');if(!/^\d{4,8}$/.test(pin))return msg(els.formMessage,'کد ویرایش باید ۴ تا ۸ رقم باشد.','error');if(!els.entryYear.value)return msg(els.formMessage,'ورودی را انتخاب کنید.','error');const courses=selectedIds();if(!courses.length)return msg(els.formMessage,'حداقل یک درس را انتخاب کنید.','error');els.submitBtn.disabled=true;const oldLabel=els.submitBtn.textContent;els.submitBtn.textContent='در حال ثبت…';msg(els.formMessage);const {data,error}=await client.rpc('save_registration',{p_student_number:student,p_first_name:els.firstName.value.trim(),p_last_name:els.lastName.value.trim(),p_entry_year:els.entryYear.value,p_course_ids:courses,p_edit_pin:pin});els.submitBtn.disabled=false;els.submitBtn.textContent=oldLabel;if(error||!data||!data.ok)return msg(els.formMessage,(data&&data.message)||error?.message||'ثبت اطلاعات انجام نشد.','error');const stamp=new Date().toLocaleString('fa-IR');const successText=editingExisting?`تغییرات شما با موفقیت ثبت شد.\nزمان ثبت: ${stamp}\nبرای ویرایش مجدد در آینده، از بخش «ویرایش پیش‌ثبت‌نام قبلی» و همان کد ویرایش استفاده کنید.`:`اطلاعات شما با موفقیت ثبت شد.\nزمان ثبت: ${stamp}\nبرای ویرایش بعدی، از بخش «ویرایش پیش‌ثبت‌نام قبلی» وارد شوید و شماره دانشجویی و کد ویرایش خود را وارد کنید.\nکد ویرایش خود را نزد خود نگه دارید.`;msg(els.formMessage,successText,'ok');window.scrollTo({top:els.formMessage.offsetTop-140,behavior:'smooth'});}
+els.registerModeBtn.addEventListener('click',()=>{if(editingExisting)clearForm();setView('register');});els.editModeBtn.addEventListener('click',()=>setView('edit'));els.loadBtn.addEventListener('click',loadExisting);els.entryYear.addEventListener('change',renderCourses);els.courseSearch.addEventListener('input',renderCourses);els.resetBtn.addEventListener('click',()=>clearForm());els.form.addEventListener('submit',submitRegistration);
+(async()=>{if(configured){els.dbStatus.textContent='پایگاه داده متصل';els.dbStatus.classList.add('ok');try{await loadStatus();if(registrationOpen)await loadCatalog();}catch(e){els.dbStatus.textContent='خطا در اتصال';els.dbStatus.classList.add('bad');els.closedNoticeText.textContent='خطا در دریافت وضعیت سامانه: '+e.message;els.closedNotice.classList.remove('hidden');els.studentInteractiveArea.classList.add('hidden');}}else{els.dbStatus.textContent='نیازمند تنظیم اتصال';els.dbStatus.classList.add('bad');els.closedNoticeText.textContent='اتصال پایگاه داده تنظیم نشده است.';els.closedNotice.classList.remove('hidden');els.studentInteractiveArea.classList.add('hidden');}setView('register');})();
